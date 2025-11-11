@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu AI Flow Editor de Luxo</title>
+    <!-- Carrega o Tailwind CSS para um design moderno e luxuoso -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Usa a fonte Inter -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a1a2e; /* Fundo Escuro Luxuoso */
+            overflow: hidden; 
+        }
+        .flow-canvas {
+            min-height: calc(100vh - 5rem); 
+            position: relative;
+            background-image: radial-gradient(#303050 1px, transparent 1px); /* Grid mais escuro */
+            background-size: 25px 25px;
+            cursor: grab;
+        }
+        .node {
+            position: absolute;
+            transition: box-shadow 0.1s, transform 0.1s;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #e5e7eb;
+            z-index: 10;
+        }
+        .node:active {
+            cursor: grabbing;
+        }
+        .node:hover {
+            transform: translateY(-2px);
+        }
+        .connection-port {
+            width: 12px;
+            height: 12px;
+            background-color: #38bdf8; /* Azul Neon */
+            border-radius: 50%;
+            position: absolute;
+            right: -6px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: crosshair; /* Cursor para indicar arrastar a linha */
+            border: 2px solid #1a1a2e;
+            transition: transform 0.1s;
+            z-index: 12; 
+            pointer-events: all; /* Garante que podemos clicar e arrastar */
+        }
+        .connection-port:hover {
+            transform: translateY(-50%) scale(1.3);
+            background-color: #f87171; 
+        }
+        .node-selected {
+            box-shadow: 0 0 0 4px #38bdf8;
+        }
+        .citation {
+            display: inline-block;
+            margin-right: 8px;
+            padding: 2px 6px;
+            background-color: #1e3a8a;
+            color: #bfdbfe;
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+        /* Estilo para Textarea dentro do Nó */
+        .node textarea {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #f3f4f6;
+            border: 1px solid #3f3f46;
+        }
+        #trashBin.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        #trashBin {
+            /* Fixa a lixeira no canto inferior do canvas */
+            position: absolute; 
+            bottom: 0;
+            left: 0;
+            width: 300px; /* Largura fixa para facilitar o alvo */
+            height: 100px;
+            background-color: #dc2626; /* Vermelho escuro */
+            border-top: 4px solid #f87171; /* Borda vermelha clara */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.25rem;
+            font-weight: bold;
+            transition: opacity 0.3s, background-color 0.3s;
+            opacity: 0;
+            pointer-events: none; /* Ignora cliques até que um nó seja arrastado */
+            border-radius: 0 12px 0 0;
+            box-shadow: 0 -10px 30px rgba(220, 38, 38, 0.5);
+            z-index: 30;
+        }
+        #trashBin.hovered {
+            background-color: #b91c1c; /* Vermelho mais escuro ao pairar */
+        }
+        .node input[type="file"] {
+            border: none;
+            padding: 0;
+            margin: 0;
+            cursor: pointer;
+            overflow: hidden; /* Para esconder o "No file chosen" */
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Cabeçalho Principal (Luxuoso) -->
+    <header class="bg-[#0f0f1d] shadow-2xl p-4 flex justify-between items-center z-50 border-b border-[#38bdf8]">
+        <h1 class="text-2xl font-extrabold text-white tracking-wider">
+            Meu <span class="text-[#38bdf8]">Flow</span> Editor <span class="text-[#facc15] text-sm">LUXO</span>
+        </h1>
+        <div class="flex space-x-4">
+             <!-- Botão de Limpar Tudo -->
+            <button id="clearFlowButton" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg shadow-xl transition duration-200 transform hover:scale-[1.02] text-sm">
+                Limpar Tudo 🗑️
+            </button>
+            <!-- Botão de Executar Fluxo -->
+            <button id="runFlowButton" class="bg-[#10b981] hover:bg-[#059669] text-white font-bold py-2 px-6 rounded-lg shadow-xl transition duration-200 transform hover:scale-[1.02]">
+                Executar Fluxo ✨
+            </button>
+        </div>
+    </header>
+
+    <div class="flex">
+        <!-- Sidebar de Nós (Node Palette - Escura) -->
+        <aside class="w-64 bg-[#1e1e3f] p-4 shadow-2xl h-[calc(100vh-5rem)] overflow-y-auto">
+            <h2 class="text-lg font-bold mb-4 text-[#38bdf8] border-b border-gray-600 pb-2">Nós de IA Avançados</h2>
+
+            <!-- Nó 1: Entrada de Texto -->
+            <div id="palette-text" class="draggable-palette-node bg-[#2a2a4f] p-3 mb-3 border border-gray-600 rounded-xl shadow-lg hover:shadow-xl cursor-grab"
+                 data-node-type="text_input" data-title="Prompt Base" data-color="bg-[#2a2a4f]">
+                <span class="font-medium text-gray-300">✍️ Prompt Base</span>
+                <p class="text-xs text-gray-400 mt-1">Define o prompt principal.</p>
+            </div>
+
+            <!-- Nó 2: LLM (Modelo de Linguagem) -->
+            <div id="palette-llm" class="draggable-palette-node bg-[#2a2a4f] p-3 mb-3 border border-gray-600 rounded-xl shadow-lg hover:shadow-xl cursor-grab"
+                 data-node-type="llm_prompt" data-title="LLM (Gemini Flash)" data-color="bg-[#2a2a4f]">
+                <span class="font-medium text-[#38bdf8]">🧠 LLM (Gemini Flash)</span>
+                <p class="text-xs text-gray-400 mt-1">Gera conteúdo usando a Instrução do Sistema e a Entrada.</p>
+            </div>
+            
+            <!-- NÓ: Upload de Imagem (Image Input) -->
+            <div id="palette-image-input" class="draggable-palette-node bg-[#2a2a4f] p-3 mb-3 border border-gray-600 rounded-xl shadow-lg hover:shadow-xl cursor-grab"
+                 data-node-type="image_input" data-title="Upload de Imagem" data-color="bg-[#2a2a4f]">
+                <span class="font-medium text-[#facc15]">🖼️ Upload de Imagem</span>
+                <p class="text-xs text-gray-400 mt-1">Upload de ficheiro para análise multimodal.</p>
+            </div>
+
+            <!-- Nó 3: Geração de Imagem (Real - Imagen) -->
+            <div id="palette-image" class="draggable-palette-node bg-[#2a2a4f] p-3 mb-3 border border-gray-600 rounded-xl shadow-lg hover:shadow-xl cursor-grab"
+                 data-node-type="image_gen" data-title="Gerador de Imagem (Imagen)" data-color="bg-[#2a2a4f]">
+                <span class="font-medium text-[#c084fc]">✨ Gerador de Imagem</span>
+                <p class="text-xs text-gray-400 mt-1">Cria imagem via API (Imagen).</p>
+            </div>
+
+            <!-- NÓ: Geração de Vídeo (Simulado) -->
+            <div id="palette-video" class="draggable-palette-node bg-[#2a2a4f] p-3 mb-3 border border-gray-600 rounded-xl shadow-lg hover:shadow-xl cursor-grab"
+                 data-node-type="video_gen" data-title="Gerador de Vídeo" data-color="bg-[#2a2a4f]">
+                <span class="font-medium text-[#fb7185]">🎬 Gerador de Vídeo</span>
+                <p class="text-xs text-gray-400 mt-1">Funcionalidade Futura (Simulado - Apenas Display).</p>
+            </div>
+
+            <!-- Nó 4: Saída -->
+            <div id="palette-output" class="draggable-palette-node bg-[#2a2a4f] p-3 mb-3 border border-gray-600 rounded-xl shadow-lg hover:shadow-xl cursor-grab"
+                 data-node-type="output" data-title="Saída Final" data-color="bg-[#2a2a4f]">
+                <span class="font-medium text-[#10b981]">✅ Saída Final</span>
+                <p class="text-xs text-gray-400 mt-1">Resultado do fluxo (Apenas Display).</p>
+            </div>
+        </aside>
+
+        <!-- Área de Edição de Fluxo (Canvas) -->
+        <main id="flowCanvas" class="flex-1 flow-canvas">
+            <svg id="connectionSvg" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></svg>
+
+            <!-- Caixote do Lixo (Trash Bin) -->
+            <div id="trashBin">
+                🗑️ Arraste um Nó para Apagar
+            </div>
+
+            <!-- Mensagem de Instrução Inicial -->
+            <div id="initial-message" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div class="bg-[#1e1e3f]/95 p-8 rounded-2xl shadow-[0_20px_50px_rgba(50,50,93,0.9)] max-w-lg text-center border-t-4 border-[#38bdf8]">
+                    <h3 class="text-2xl font-bold text-white mb-2">Bem-vindo à Experiência Premium!</h3>
+                    <p class="text-gray-400 mb-4">Arraste os nós para criar fluxos de IA de texto e geração de imagem.</p>
+                    <ul class="text-sm text-left mx-auto max-w-xs space-y-1 text-gray-300">
+                        <li>1. Arraste os nós para o canvas.</li>
+                        <li>2. **ARRRASTE** do ponto azul para conectar.</li>
+                        <li>3. Arraste um nó para o "Caixote do Lixo" para apagar.</li>
+                        <li>4. Clique em "Executar Fluxo ✨" para obter um resultado real!</li>
+                    </ul>
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <!-- Modal de Resultado/Logs (Apenas Resultado e Fontes) -->
+    <div id="logModal" class="fixed inset-0 bg-gray-900 bg-opacity-80 hidden items-center justify-center p-4 z-50">
+        <div class="bg-[#2a2a4f] rounded-xl shadow-[0_20px_50px_rgba(50,50,93,0.9)] w-full max-w-5xl max-h-[90vh] flex flex-col border border-gray-700">
+            <header class="p-4 border-b border-gray-700 flex justify-between items-center bg-[#1e1e3f]">
+                <h2 class="text-xl font-bold text-[#38bdf8]">Resultado da Execução do AI Flow</h2>
+                <button id="closeModal" class="text-gray-400 hover:text-white transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </header>
+            <div class="p-6 flex-1 overflow-y-auto text-gray-300">
+                
+                <div id="resultOutput" class="mb-6">
+                    <!-- Conteúdo de Imagem ou Texto será injetado aqui -->
+                </div>
+
+                <h3 class="text-lg font-semibold mb-2 text-[#facc15] border-t border-gray-700 pt-4">Fontes (Grounding - Pesquisa Google):</h3>
+                <div id="citations" class="flex flex-wrap gap-2 mb-6">
+                    <p id="noCitations" class="text-sm text-gray-500">Nenhuma fonte citada pelo modelo.</p>
+                </div>
+                
+            </div>
+            <footer class="p-4 border-t border-gray-700 text-sm text-gray-500 bg-[#1e1e3f]">
+                Modelos utilizados: Texto (Gemini Flash), Imagem (Imagen 4.0).
+            </footer>
+        </div>
+    </div>
+
+
+    <script type="module">
+        // Importações necessárias para o Firebase (boilerplate obrigatório)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Variáveis globais obrigatórias do ambiente
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db, auth, app;
+        let userId = 'anon_user';
+        const API_KEY = ""; // Chave de API vazia, será fornecida pelo ambiente
+        
+        // Configurações dos modelos
+        const GEMINI_MODEL = 'gemini-2.5-flash-preview-09-2025';
+        const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${API_KEY}`;
+        
+        const IMAGEN_MODEL = 'imagen-4.0-generate-001';
+        const IMAGEN_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${IMAGEN_MODEL}:predict?key=${API_KEY}`;
+        
+        // 1. Inicialização e Autenticação do Firebase (Boilerplate Obrigatório)
+        async function initializeFirebase() {
+            if (Object.keys(firebaseConfig).length === 0) {
+                 console.log("Firebase config not available. Running in standalone mode.");
+                 return;
+            }
+
+            try {
+                setLogLevel('Debug');
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        console.log("Usuário autenticado:", userId);
+                    } else {
+                        userId = 'anon_user_' + crypto.randomUUID();
+                        console.log("Usuário anônimo:", userId);
+                    }
+                });
+            } catch (error) {
+                console.error("Erro ao inicializar ou autenticar o Firebase:", error);
+            }
+        }
+        initializeFirebase();
+
+        // --- Variáveis e Elementos do DOM ---
+        const flowCanvas = document.getElementById('flowCanvas');
+        const connectionSvg = document.getElementById('connectionSvg');
+        const initialMessage = document.getElementById('initial-message');
+        const runFlowButton = document.getElementById('runFlowButton');
+        const clearFlowButton = document.getElementById('clearFlowButton');
+        const trashBin = document.getElementById('trashBin');
+        const logModal = document.getElementById('logModal');
+        const resultOutput = document.getElementById('resultOutput');
+        const citationsContainer = document.getElementById('citations');
+        const noCitations = document.getElementById('noCitations');
+        const closeModal = document.getElementById('closeModal');
+
+        // Variáveis de Estado
+        let nodes = [];
+        let connections = [];
+        let nextNodeId = 1;
+        let draggedNode = null;
+        let dragOffsetX, dragOffsetY;
+        const nodeElements = new Map();
+        const findNodeById = (id) => nodes.find(n => n.id === id);
+
+
+        // --- Funções de Upload de Imagem ---
+
+        function handleImageUpload(e, nodeId) {
+            const file = e.target.files[0];
+            if (!file || !file.type.startsWith('image/')) {
+                console.error("Tipo de ficheiro inválido.");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const base64DataUrl = event.target.result; // e.g., 'data:image/jpeg;base64,...'
+                const node = findNodeById(nodeId);
+                
+                if (node) {
+                    // Armazena a string Base64 (somente os dados após a vírgula) e o mimeType
+                    node.data.base64Image = base64DataUrl.split(',')[1];
+                    node.data.mimeType = file.type;
+
+                    // Atualiza a pré-visualização
+                    const previewDiv = document.getElementById(`preview-${nodeId}`);
+                    if (previewDiv) {
+                        previewDiv.innerHTML = `<img src="${base64DataUrl}" alt="Preview" class="w-full h-full object-contain rounded">`;
+                        previewDiv.classList.remove('text-gray-500');
+                        previewDiv.classList.add('p-0');
+                    }
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Variáveis de Conexão por Arrastar
+        let isDrawingConnection = false;
+        let currentSourceNodeId = null;
+        let tempLine = null;
+
+
+        // --- 2. Geração e Manipulação de Nós ---
+
+        function deleteNode(nodeId) {
+            // Remove o elemento do DOM
+            const nodeEl = nodeElements.get(nodeId);
+            if (nodeEl) {
+                flowCanvas.removeChild(nodeEl);
+                nodeElements.delete(nodeId);
+            }
+
+            // Remove da lista de nós
+            nodes = nodes.filter(n => n.id !== nodeId);
+
+            // Remove conexões associadas
+            connections.forEach(conn => {
+                const line = document.getElementById(`conn-${conn.id}`);
+                if (line) connectionSvg.removeChild(line);
+            });
+            connections = connections.filter(c => c.sourceId !== nodeId && c.targetId !== nodeId);
+
+            redrawConnections();
+
+            if (nodes.length === 0 && initialMessage) {
+                initialMessage.classList.remove('hidden');
+            }
+        }
+        
+        function clearFlow() {
+            // Cria uma cópia reversa para evitar problemas de índice ao apagar
+            [...nodes].reverse().forEach(node => deleteNode(node.id));
+            nextNodeId = 1;
+        }
+
+
+        /**
+         * Cria um novo nó no canvas.
+         */
+        function createNode(type, title, colorClass, x, y) {
+            const nodeId = nextNodeId++;
+            let contentText = '';
+            
+            if (type === 'text_input') {
+                contentText = 'Escreva aqui o seu prompt principal (ex: "Ideias para um jantar vegano").';
+            } else if (type === 'llm_prompt') {
+                // Conteúdo para o System Instruction
+                contentText = `Instrução para o LLM (ex: "Aja como um chef, transforme a lista em uma receita detalhada.").`;
+            } else if (type === 'image_input') {
+                contentText = 'Contexto da Imagem (Opcional): "O que há de errado com isto?"';
+            } else if (type === 'image_gen') {
+                contentText = 'Descreva a imagem que deseja gerar (ex: "Um gato cyberpunk, estilo neon, ultra detalhado").';
+            } else if (type === 'video_gen') {
+                contentText = 'Resultado da simulação de vídeo. (Apenas Display)';
+            } else if (type === 'output') {
+                 contentText = 'Resultado final do fluxo. (Apenas Display)';
+            }
+
+            const nodeData = {
+                id: nodeId,
+                type: type,
+                title: title,
+                x: x,
+                y: y,
+                content: contentText, // Usado para System Instruction, Prompt, ou Image Caption/Context
+                data: {} // Usado para Base64 da Imagem
+            };
+            
+            // Inicialização de dados específicos
+            if (type === 'image_input') {
+                nodeData.data.base64Image = null;
+                nodeData.data.mimeType = null;
+            }
+
+            nodes.push(nodeData);
+
+            const nodeElement = document.createElement('div');
+            nodeElement.id = `node-${nodeId}`;
+            nodeElement.classList.add('node', 'rounded-xl', 'shadow-2xl', 'w-64', colorClass, 'p-4', 'hover:shadow-[0_20px_50px_rgba(50,50,93,0.9)]');
+            nodeElement.style.left = `${x}px`;
+            nodeElement.style.top = `${y}px`;
+            nodeElement.dataset.nodeId = nodeId;
+
+            let contentHtml = '';
+            
+            // Define o HTML do conteúdo com base no tipo de nó
+            if (type === 'llm_prompt') {
+                 // LLM: Usa textarea para a Instrução do Sistema
+                 contentHtml = `
+                    <label class="text-xs text-gray-400 mb-1 block">Instrução do Sistema (Opcional):</label>
+                    <textarea class="w-full h-16 p-1 text-sm rounded border focus:ring-blue-500 focus:border-blue-500" data-node-id="${nodeId}">${nodeData.content}</textarea>
+                 `;
+            } else if (type === 'image_input') {
+                // Image Input: File input, preview, and caption textarea
+                 contentHtml = `
+                    <div class="p-2 border rounded bg-[#10101f]/50 mb-2 h-20 flex items-center justify-center text-gray-500 text-sm overflow-hidden" id="preview-${nodeId}">
+                        Clique em 'Escolher ficheiro'
+                    </div>
+                    <input type="file" class="image-file-input text-xs w-full text-gray-400 p-1 bg-[#1a1a2e] rounded cursor-pointer" accept="image/*" data-node-id="${nodeId}">
+                    
+                    <label class="text-xs text-gray-400 mt-2 block">Legenda/Contexto (Opcional):</label>
+                    <textarea class="w-full h-10 p-1 text-sm rounded border focus:ring-blue-500 focus:border-blue-500" data-node-id="${nodeId}">${nodeData.content}</textarea>
+                `;
+
+            } else if (type === 'output' || type === 'video_gen') {
+                 // Output/Video: Apenas Display (Div)
+                 contentHtml = `<div class="text-xs text-gray-400 p-2 h-16 border rounded bg-[#10101f]/50 overflow-auto">${nodeData.content}</div>`;
+            } else {
+                 // Default (text_input, image_gen): Usa textarea
+                 contentHtml = `<textarea class="w-full h-16 p-1 text-sm rounded border focus:ring-blue-500 focus:border-blue-500" data-node-id="${nodeId}">${nodeData.content}</textarea>`;
+            }
+
+
+            // Conteúdo final do Nó
+            nodeElement.innerHTML = `
+                <div class="font-bold mb-2 cursor-move text-white">${nodeData.title}</div>
+                <div class="text-xs text-gray-400 mb-2">${nodeData.type}</div>
+                ${contentHtml}
+                <div class="connection-port" data-port-id="${nodeId}" title="Arraste para Conectar"></div>
+            `;
+
+            // Adiciona o listener para atualizar o conteúdo quando o usuário digita (se houver textarea)
+            const textarea = nodeElement.querySelector('textarea');
+            if (textarea) {
+                textarea.addEventListener('input', (e) => {
+                    const node = findNodeById(nodeId);
+                    if (node) {
+                        node.content = e.target.value;
+                    }
+                });
+            }
+            
+            // Adiciona o listener para upload de ficheiro
+            if (type === 'image_input') {
+                const fileInput = nodeElement.querySelector('.image-file-input');
+                fileInput.addEventListener('change', (e) => handleImageUpload(e, nodeId));
+            }
+
+
+            // Lógica de Draggable (Mover Nó)
+            nodeElement.addEventListener('mousedown', (e) => handleNodeMouseDown(e, nodeData));
+
+            // Lógica de Conexão (Porta) - Alterado para mousedown/mouseup
+            const port = nodeElement.querySelector('.connection-port');
+            port.addEventListener('mousedown', (e) => handlePortMouseDown(e, nodeId));
+
+            flowCanvas.appendChild(nodeElement);
+            nodeElements.set(nodeId, nodeElement);
+
+            if (initialMessage) initialMessage.classList.add('hidden');
+        }
+
+        // --- 3. Lógica de Drag-and-Drop, Mover Nós e Conexão ---
+        
+        document.querySelectorAll('.draggable-palette-node').forEach(paletteNode => {
+            paletteNode.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', JSON.stringify({
+                    type: paletteNode.dataset.nodeType,
+                    title: paletteNode.dataset.title,
+                    color: paletteNode.dataset.color
+                }));
+            });
+            paletteNode.draggable = true;
+        });
+
+        flowCanvas.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        flowCanvas.addEventListener('drop', (e) => {
+            e.preventDefault();
+            try {
+                const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                
+                const rect = flowCanvas.getBoundingClientRect();
+                const offsetX = e.clientX - rect.left - flowCanvas.parentElement.offsetLeft;
+                const offsetY = e.clientY - rect.top;
+
+                createNode(data.type, data.title, data.color, offsetX, offsetY);
+            } catch (error) {
+                console.warn("Tentativa de drop não reconhecida.");
+            }
+        });
+
+
+        function handleNodeMouseDown(e, nodeData) {
+            // Impede o drag se o clique for na textarea ou na porta ou no input de ficheiro
+            if (e.target.tagName === 'TEXTAREA' || e.target.classList.contains('connection-port') || e.target.type === 'file') {
+                return;
+            }
+
+            e.preventDefault();
+            draggedNode = nodeElements.get(nodeData.id);
+            if (!draggedNode) return;
+
+            // Ativa o Caixote do Lixo
+            trashBin.classList.add('active');
+
+            dragOffsetX = e.clientX - nodeData.x;
+            dragOffsetY = e.clientY - nodeData.y;
+
+            draggedNode.classList.add('shadow-3xl', 'z-20', 'ring-4', 'ring-[#38bdf8]');
+
+            document.addEventListener('mousemove', handleNodeMouseMove);
+            document.addEventListener('mouseup', handleNodeMouseUp);
+        }
+
+        function handleNodeMouseMove(e) {
+            if (!draggedNode) return;
+
+            const nodeId = parseInt(draggedNode.dataset.nodeId);
+            const node = findNodeById(nodeId);
+            const canvasRect = flowCanvas.getBoundingClientRect();
+
+            if (node) {
+                node.x = e.clientX - canvasRect.left - dragOffsetX;
+                node.y = e.clientY - canvasRect.top - dragOffsetY;
+
+                draggedNode.style.left = `${node.x}px`;
+                draggedNode.style.top = `${node.y}px`;
+
+                redrawConnections();
+                
+                // Checa se está sobre o Caixote do Lixo
+                const trashRect = trashBin.getBoundingClientRect();
+                if (e.clientX >= trashRect.left && e.clientX <= trashRect.right &&
+                    e.clientY >= trashRect.top && e.clientY <= trashRect.bottom) {
+                    trashBin.classList.add('hovered');
+                } else {
+                    trashBin.classList.remove('hovered');
+                }
+            }
+        }
+
+        function handleNodeMouseUp(e) {
+            if (draggedNode) {
+                const nodeId = parseInt(draggedNode.dataset.nodeId);
+                
+                // Checa se foi solto sobre o Caixote do Lixo
+                const trashRect = trashBin.getBoundingClientRect();
+                if (e.clientX >= trashRect.left && e.clientX <= trashRect.right &&
+                    e.clientY >= trashRect.top && e.clientY <= trashRect.bottom) {
+                    deleteNode(nodeId);
+                }
+
+                draggedNode.classList.remove('shadow-3xl', 'z-20', 'ring-4', 'ring-[#38bdf8]');
+                trashBin.classList.remove('active', 'hovered');
+                draggedNode = null;
+            }
+            document.removeEventListener('mousemove', handleNodeMouseMove);
+            document.removeEventListener('mouseup', handleNodeMouseUp);
+        }
+
+        // --- Lógica de Conexão por Arrastar ---
+
+        function handlePortMouseDown(e, nodeId) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            isDrawingConnection = true;
+            currentSourceNodeId = nodeId;
+
+            // Cria a linha temporária
+            tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            tempLine.setAttribute('stroke', '#facc15'); // Cor de arrasto (Amarelo/Ouro)
+            tempLine.setAttribute('stroke-width', '4');
+            tempLine.setAttribute('stroke-dasharray', '5,5');
+            connectionSvg.appendChild(tempLine);
+
+            const startPos = getNodePortPosition(nodeId, true); 
+            tempLine.setAttribute('x1', startPos.x);
+            tempLine.setAttribute('y1', startPos.y);
+
+            // Adiciona listeners globais para arrastar
+            flowCanvas.addEventListener('mousemove', handleConnectionDrag);
+            document.addEventListener('mouseup', handleConnectionMouseUp);
+        }
+        
+        function handleConnectionDrag(e) {
+            if (!isDrawingConnection) return;
+            
+            const canvasRect = flowCanvas.getBoundingClientRect();
+            const x2 = e.clientX - canvasRect.left;
+            const y2 = e.clientY - canvasRect.top;
+
+            tempLine.setAttribute('x2', x2);
+            tempLine.setAttribute('y2', y2);
+        }
+
+        function handleConnectionMouseUp(e) {
+            if (!isDrawingConnection) return;
+
+            isDrawingConnection = false;
+            
+            // Remove o listener de mousemove do canvas e o mouseup do document
+            flowCanvas.removeEventListener('mousemove', handleConnectionDrag);
+            document.removeEventListener('mouseup', handleConnectionMouseUp);
+
+            // Tenta encontrar o nó de destino
+            const targetPort = e.target.closest('.connection-port');
+            const targetNodeEl = targetPort ? targetPort.closest('.node') : null;
+            const targetNodeId = targetNodeEl ? parseInt(targetNodeEl.dataset.nodeId) : null;
+            
+            // Cleanup: remove a linha temporária
+            if (tempLine) {
+                connectionSvg.removeChild(tempLine);
+                tempLine = null;
+            }
+
+            if (targetNodeId && targetNodeId !== currentSourceNodeId) {
+                // Conexão Válida
+                const exists = connections.some(c =>
+                    (c.sourceId === currentSourceNodeId && c.targetId === targetNodeId) ||
+                    (c.sourceId === targetNodeId && c.targetId === currentSourceNodeId)
+                );
+
+                if (!exists) {
+                    const newConnId = connections.length + 1;
+                    connections.push({
+                        id: newConnId,
+                        sourceId: currentSourceNodeId,
+                        targetId: targetNodeId
+                    });
+                    console.log(`Conexão criada entre ${findNodeById(currentSourceNodeId).title} e ${findNodeById(targetNodeId).title}`);
+                    redrawConnections();
+                }
+            }
+
+            currentSourceNodeId = null;
+        }
+        
+        // --- Funções de Desenho ---
+
+        function getNodePortPosition(nodeId) {
+            const nodeEl = nodeElements.get(nodeId);
+            if (!nodeEl) return { x: 0, y: 0 };
+
+            const rect = nodeEl.getBoundingClientRect();
+            const canvasRect = flowCanvas.getBoundingClientRect();
+            
+            // Posição do ponto de conexão (canto superior direito do elemento + metade da altura, ajustado pelo offset do canvas)
+            const x = rect.left + rect.width - 6 - canvasRect.left; 
+            const y = rect.top + (rect.height / 2) - canvasRect.top;
+
+            return { x, y };
+        }
+
+        function createSvgLine(connectionId) {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('stroke', '#38bdf8'); /* Azul Neon */
+            line.setAttribute('stroke-width', '3');
+            line.setAttribute('id', `conn-${connectionId}`);
+            connectionSvg.appendChild(line);
+            return line;
+        }
+
+        function redrawConnections() {
+            connections.forEach(conn => {
+                let line = document.getElementById(`conn-${conn.id}`);
+                if (!line) {
+                    line = createSvgLine(conn.id);
+                }
+
+                const startPos = getNodePortPosition(conn.sourceId);
+                const endPos = getNodePortPosition(conn.targetId);
+
+                line.setAttribute('x1', startPos.x);
+                line.setAttribute('y1', startPos.y);
+                line.setAttribute('x2', endPos.x);
+                line.setAttribute('y2', endPos.y);
+            });
+        }
+
+        
+        // --- 4. Funções de Chamada de API com Retry ---
+        
+        async function fetchWithRetry(url, options, maxRetries = 3) {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (response.status === 429 || response.status >= 500) {
+                        if (i === maxRetries - 1) throw new Error(`API falhou após ${maxRetries} retentativas com status ${response.status}`);
+                        const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                        console.warn(`Tentativa de Retry ${i + 1}. Tentando novamente em ${delay / 1000}s...`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        continue;
+                    }
+                    if (!response.ok) {
+                        const errorBody = await response.text();
+                        throw new Error(`API respondeu com status ${response.status}: ${errorBody}`);
+                    }
+                    return response;
+                } catch (error) {
+                    if (i === maxRetries - 1) throw error;
+                    const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                    console.warn(`Erro no Fetch na tentativa ${i + 1}. Tentando novamente em ${delay / 1000}s... Erro: ${error.message}`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+            throw new Error("Máximo de retentativas atingido para a chamada de API.");
+        }
+
+        // --- 5. Funções de Execução do Fluxo ---
+
+        function processGeminiResponse(result) {
+            let generatedText = "Erro: A resposta da IA não contém texto.";
+            let sources = [];
+
+            const candidate = result.candidates?.[0];
+
+            if (candidate && candidate.content?.parts?.[0]?.text) {
+                generatedText = candidate.content.parts[0].text;
+            }
+
+            const groundingMetadata = candidate?.groundingMetadata;
+            if (groundingMetadata && groundingMetadata.groundingAttributions) {
+                sources = groundingMetadata.groundingAttributions
+                    .map(attribution => ({
+                        uri: attribution.web?.uri,
+                        title: attribution.web?.title,
+                    }))
+                    .filter(source => source.uri && source.title);
+            }
+
+            return { type: 'text', content: generatedText, sources };
+        }
+        
+        function processImagenResponse(result) {
+            let base64Data = null;
+            
+            if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
+                base64Data = result.predictions[0].bytesBase64Encoded;
+            } else {
+                return { type: 'error', content: "Erro: A resposta do Imagen não contém dados de imagem válidos." };
+            }
+
+            return { type: 'image', content: `data:image/png;base64,${base64Data}` };
+        }
+
+        async function runFlow() {
+            runFlowButton.disabled = true;
+            runFlowButton.textContent = '... Executando';
+            runFlowButton.classList.remove('bg-[#10b981]', 'hover:bg-[#059669]');
+            runFlowButton.classList.add('bg-gray-500', 'cursor-not-allowed');
+
+            try {
+                // 1. Encontra nós chave e define o modo de execução
+                const inputNode = nodes.find(n => n.type === 'text_input');
+                const llmNode = nodes.find(n => n.type === 'llm_prompt');
+                const imageGenNode = nodes.find(n => n.type === 'image_gen');
+                const videoGenNode = nodes.find(n => n.type === 'video_gen');
+                const imageInputNode = nodes.find(n => n.type === 'image_input'); // Novo nó de Imagem
+                
+                let mode = 'text'; 
+                let primaryNode = llmNode;
+                
+                // Prioridade de execução: Imagem > Vídeo (Sim) > Texto
+                if (imageGenNode) {
+                    mode = 'image';
+                    primaryNode = imageGenNode;
+                } else if (videoGenNode) {
+                    mode = 'video_sim';
+                    primaryNode = videoGenNode;
+                } else if (!llmNode) {
+                    throw new Error("O fluxo precisa de um nó 'LLM (Gemini)' ou 'Gerador de Imagem' para executar. Por favor, arraste um para o canvas.");
+                }
+
+                // 2. Constrói o Prompt e a Instrução do Sistema
+                
+                const baseContent = inputNode ? inputNode.content : '';
+                
+                let prompt = '';
+                let systemInstruction = '';
+
+                let resultData = { type: 'error', content: "Nenhum resultado processado.", sources: [] };
+
+                if (mode === 'text') {
+                    if (!baseContent) {
+                         // Permite execução sem Prompt Base se houver imagem (multimodal)
+                         const isImagePresent = imageInputNode && imageInputNode.data.base64Image;
+                         if (!isImagePresent) {
+                             throw new Error("O fluxo de texto exige um 'Prompt Base' para fornecer o prompt principal.");
+                         }
+                    }
+                    prompt = baseContent;
+                    systemInstruction = llmNode.content; // Conteúdo do LLM é a instrução do sistema
+
+                    const contents = [{ 
+                        role: "user", 
+                        parts: [] 
+                    }];
+
+                    // ** Lógica Multimodal: Verifica se há uma imagem conectada **
+                    const isImageConnectedToLLM = imageInputNode && llmNode && connections.some(c => 
+                        c.sourceId === imageInputNode.id && c.targetId === llmNode.id
+                    );
+                    
+                    if (isImageConnectedToLLM && imageInputNode.data.base64Image) {
+                         // 1. Adiciona a Imagem como primeira parte
+                         contents[0].parts.push({
+                            inlineData: {
+                                mimeType: imageInputNode.data.mimeType,
+                                data: imageInputNode.data.base64Image
+                            }
+                        });
+                        
+                        // 2. Adiciona o Contexto da Imagem (caption do nó image_input) como segunda parte
+                        if (imageInputNode.content) {
+                            contents[0].parts.push({ text: imageInputNode.content });
+                        }
+                    }
+                    
+                    // 3. Adiciona o Prompt Principal (do nó text_input)
+                    if (prompt) {
+                        contents[0].parts.push({ text: prompt });
+                    }
+                    
+                    // Verifica se há pelo menos uma parte textual ou a imagem (evita erro de API se só houver o baseContent)
+                    if (contents[0].parts.length === 0) {
+                         throw new Error("O nó LLM está configurado, mas não recebeu texto do 'Prompt Base' ou imagem do 'Upload de Imagem'.");
+                    }
+                    
+                    const geminiPayload = {
+                        contents: contents, 
+                        tools: [{ "google_search": {} }], 
+                        systemInstruction: {
+                            parts: [{ text: systemInstruction }]
+                        },
+                    };
+                    
+                    const response = await fetchWithRetry(GEMINI_API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(geminiPayload)
+                    });
+                    resultData = processGeminiResponse(await response.json());
+
+                } else if (mode === 'image') {
+                    const descriptionContent = imageGenNode ? imageGenNode.content : '';
+                    
+                    // 1. Puxa contexto do Nó de Imagem Input, se estiver conectado
+                    let imageContext = '';
+                    const isImageConnectedToImageGen = imageInputNode && connections.some(c => 
+                        c.sourceId === imageInputNode.id && c.targetId === imageGenNode.id
+                    );
+
+                    if (isImageConnectedToImageGen && imageInputNode.content) {
+                        // Usa o conteúdo (legenda/contexto) do nó de Upload de Imagem
+                        imageContext = imageInputNode.content; 
+                    }
+                    
+                    // 2. Agrega todos os prompts (Contexto Imagem Input + Prompt Base + Descrição do Nó Imagem)
+                    // O texto aglomerado serve como um prompt rico para a nova imagem (Text-to-Image).
+                    
+                    let combinedPromptParts = [];
+                    if (imageContext) combinedPromptParts.push(`CONTEXTO DA IMAGEM: ${imageContext}`);
+                    if (baseContent) combinedPromptParts.push(`PROMPT BASE: ${baseContent}`);
+                    if (descriptionContent) combinedPromptParts.push(`DESEJO/MODIFICAÇÃO: ${descriptionContent}`);
+
+                    prompt = combinedPromptParts.join(' | ');
+
+
+                    if (!prompt) {
+                        throw new Error("O nó 'Gerador de Imagem' deve ter uma descrição para gerar a imagem.");
+                    }
+                    
+                    const imagenPayload = { 
+                        instances: [{ prompt: prompt }], 
+                        parameters: { "sampleCount": 1 } 
+                    };
+                    
+                    const response = await fetchWithRetry(IMAGEN_API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(imagenPayload)
+                    });
+                    resultData = processImagenResponse(await response.json());
+
+                } else if (mode === 'video_sim') {
+                     resultData.type = 'text';
+                     resultData.sources = [];
+                     // Usa o conteúdo do nó video_gen como descrição para a simulação
+                     const description = videoGenNode ? videoGenNode.content : "Nenhuma descrição fornecida.";
+                     resultData.content = `SIMULAÇÃO: A geração de vídeo real não está disponível no momento. O vídeo seria gerado com base no seguinte prompt:\n\n"${description}"`;
+                }
+                
+                // 3. Exibe o resultado
+                showLogs(resultData);
+
+            } catch (error) {
+                const errorResult = { type: 'text', content: `Ocorreu um erro ao executar o fluxo: ${error.message}.`, sources: [] };
+                showLogs(errorResult);
+                console.error("Erro na execução do Flow:", error);
+            } finally {
+                // Reseta o botão
+                runFlowButton.disabled = false;
+                runFlowButton.textContent = 'Executar Fluxo ✨';
+                runFlowButton.classList.remove('bg-gray-500', 'cursor-not-allowed');
+                runFlowButton.classList.add('bg-[#10b981]', 'hover:bg-[#059669]');
+            }
+        }
+
+        // --- 6. Funções de UI (Logs e Modal) ---
+
+        /**
+         * Exibe o modal com o resultado da IA.
+         */
+        function showLogs(resultData) {
+            resultOutput.innerHTML = '';
+            citationsContainer.innerHTML = '';
+            noCitations.classList.add('hidden');
+            
+            // 1. Prepara o output principal (Imagem ou Texto)
+            if (resultData.type === 'image') {
+                const img = document.createElement('img');
+                img.src = resultData.content;
+                img.alt = "Imagem Gerada pela IA";
+                img.classList.add('max-w-full', 'h-auto', 'rounded-lg', 'shadow-2xl', 'mx-auto', 'border', 'border-gray-700');
+                resultOutput.innerHTML = `<h3 class="text-lg font-semibold mb-4 text-[#c084fc]">Imagem Gerada pela IA (Imagen):</h3>`;
+                resultOutput.appendChild(img);
+                
+            } else { // 'text' ou 'error'
+                const content = resultData.content || "Nenhum conteúdo para exibir.";
+                
+                // Aplica font-serif e tamanho maior para elegância
+                resultOutput.innerHTML = `<h3 class="text-lg font-semibold mb-2 text-[#38bdf8]">Texto Gerado pela IA:</h3>
+                                          <pre class="bg-[#1e1e3f] p-6 rounded-lg text-lg font-serif text-gray-200 whitespace-pre-wrap leading-relaxed border border-gray-700">${content}</pre>`;
+                
+                // Adiciona citações se houver
+                if (resultData.sources && resultData.sources.length > 0) {
+                    resultData.sources.forEach((source, index) => {
+                        const link = document.createElement('a');
+                        link.href = source.uri;
+                        link.target = '_blank';
+                        link.rel = 'noopener noreferrer';
+                        link.classList.add('citation', 'hover:bg-blue-800', 'truncate');
+                        link.textContent = `[${index + 1}] ${source.title}`;
+                        link.title = source.uri;
+                        citationsContainer.appendChild(link);
+                    });
+                } else {
+                    noCitations.classList.remove('hidden');
+                }
+            }
+
+            // 2. Exibe o Modal
+            logModal.classList.remove('hidden');
+            logModal.classList.add('flex');
+        }
+
+        // --- Event Listeners ---
+        
+        closeModal.addEventListener('click', () => {
+            logModal.classList.remove('flex');
+            logModal.classList.add('hidden');
+        });
+
+        runFlowButton.addEventListener('click', runFlow);
+        
+        // Mantido o fix: Limpa o fluxo diretamente
+        clearFlowButton.addEventListener('click', () => {
+             clearFlow();
+             console.log("Todos os nós e conexões foram apagados (fluxo limpo).");
+        });
+
+
+        // --- Inicialização de UI ---
+
+        window.addEventListener('resize', redrawConnections);
+    </script>
+</body>
+</html>
